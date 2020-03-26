@@ -1,25 +1,226 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "ReproRes.AssignmentWeek2"
+author: "Emeline Mourocq"
+date: "20 March 2020"
+output: html_document
 ---
 
+## Set the working directory
 
-## Loading and preprocessing the data
+```{r}
+setwd("C:/Users/EmelineMourocq/Documents/Giving Life to Data Project/COURS/Coursera-Data Science Specialization/Cours 5 - Reporductilbe Research/Week 2/Assignement week 2")
+```
+
+## Install the necessary packages
+```{r, echo=TRUE, results='hide', warning=FALSE, message=FALSE}
+if (!require('ggplot2')) install.packages('ggplot2'); library('ggplot2')
+if (!require('plyr')) install.packages('plyr'); library('plyr')
+if (!require('dplyr')) install.packages('dplyr'); library('dplyr')
+if (!require('lubridate')) install.packages('lubridate'); library('lubridate')
+if (!require('chron')) install.packages('chron'); library('chron')
+```
+
+### A. Loading and preprocessing the data
+
+#### 1. Load the data (i.e. read.csv())
+
+a. Download the data.zip file, unzip it, read and load the data
+
+```{r}
+temp <- tempfile()
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",temp)
+data <- read.csv(unz(temp, "activity.csv"),sep=",")
+unlink(temp)
+```
+
+b. Get general information on the dataset
+
+```{r}
+str(data)
+head(data)
+```
+
+c. Provide a summary of the dataset
+
+```{r}
+summary(data)
+```
+
+#### 2. Process/transform the data (if necessary) into a format suitable for your analysis
+
+a. Convert the date variable to a date format, assign it to a new variable and verify the changes (str)
+
+```{r}
+data$date_F<-ymd(as.character(data$date))
+str(data)
+```
+
+b. Remove the missing values and verify the change (summary)
+
+```{r}
+noNAdata<-na.omit(data)
+summary(noNAdata)
+```
+
+### B. What is mean total number of steps taken per day?
+
+#### 1. Make an histogram of the total number of steps taken each day
+
+a. Get the total value of steps per day
+
+```{r}
+SpDsum<-ddply(noNAdata,.(date_F),summarize,TotSteps=sum(steps))
+summary(SpDsum)
+```
+
+b. Make the histogram
+
+```{r}
+ggplot(SpDsum, aes(x=TotSteps)) + geom_histogram(binwidth=1000) +
+        xlab("Total number of steps per day") + ylab("Frequency") +theme_bw()
+```
+
+#### 2. Calculate and report the mean and median total number of steps taken per day
+
+a. Gives the mean
+
+```{r}
+mean(SpDsum$TotSteps)
+```
+
+b. Gives the mediane
+
+```{r}
+median(SpDsum$TotSteps)
+```
+
+### C. What is the average daily activity pattern?
+
+#### 1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+a. Get the average value of steps per interval across all days
+
+```{r}
+SpImean<-ddply(noNAdata,.(interval),summarize,MeanSteps=mean(steps))
+summary(SpImean)
+```
+
+b. Make the time series plot
+
+```{r}
+ggplot(SpImean, aes(x=interval,y=MeanSteps)) + geom_line() +
+        xlab("5-minute interval") + ylab("Average number of steps") +theme_bw()
+```
+
+#### 2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+Get the interval with maximum number of steps
+
+```{r}
+SpImean[which.max(SpImean$MeanSteps),]$interval
+```
+
+### D. Imputing missing values
+
+#### 1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+```{r}
+sum(is.na(data$steps))
+```
+
+#### 2. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+a. group by interval, replace NA steps by the mean step for this interval rounded to 2 digits, store it in the variable named noNAsteps, verify the changes (summary, head)
+ 
+```{r}
+dataRepNA <-data %>% 
+        group_by(interval) %>%
+        mutate(noNAsteps= replace(steps, is.na(steps), round(mean(steps, na.rm=TRUE),2)))
+summary(dataRepNA)
+head(dataRepNA)
+```
 
 
+#### 3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
 
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
+```{r}
+dataNAfilled<-cbind(dataRepNA$noNAsteps,data[,-1])
+names(dataNAfilled)[1] <- "noNAsteps"
+dataNAfilled<-select(dataNAfilled,noNAsteps,date_F,interval)
+str(dataNAfilled)
+```
 
 
+#### 4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
 
-## Are there differences in activity patterns between weekdays and weekends?
+a. Get the total value of steps per day
+
+```{r}
+noNASpDsum<-ddply(dataNAfilled,.(date_F),summarize,TotStepsnoNA=sum(noNAsteps))
+summary(noNASpDsum)
+```
+
+b. Make the histogram
+
+```{r}
+ggplot(noNASpDsum, aes(x=TotStepsnoNA)) + geom_histogram(binwidth=1000) +
+        xlab("Total number of steps per day") + ylab("Frequency") +theme_bw()
+```
+
+c. Gives the mean with and without imputation
+
+```{r}
+mean(noNASpDsum$TotStepsnoNA)
+mean(SpDsum$TotSteps)
+```
+
+d. Gives the mediane with and without imputation
+
+```{r}
+median(noNASpDsum$TotStepsnoNA)
+median(SpDsum$TotSteps)
+```
+
+Do these values differ from the estimates from the first part of the assignment? 
+
+They are quite similar
+
+What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+The mean could be considered equal, and the median slightly smaller
+
+### E. Are there differences in activity patterns between weekdays and weekends?
+
+#### 1. Create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+
+```{r}
+dataNAfilled$dayType = as.factor(chron::is.weekend(dataNAfilled$date_F))
+levels(dataNAfilled$dayType)<-c("weekday","weekend")
+str(dataNAfilled)
+```
+
+
+#### 2. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+ 
+a. Get the average value of steps per interval for weekday and weekend
+
+```{r}
+SpImeanDayType<-dataNAfilled %>% group_by(dayType,interval) %>% 
+        summarise (MeanSteps = mean(noNAsteps))
+summary(SpImeanDayType)
+```
+
+b. Make the time series plot for weekday and weekend Option 1
+
+```{r}
+ggplot(SpImeanDayType, aes(x=interval,y=MeanSteps)) + geom_line() +
+        xlab("5-minute interval") + ylab("Average number of steps") +
+        facet_grid(dayType ~ .) + theme_bw()
+```
+
+b. Make the time series plot for weekday and weekend Option 2
+
+```{r}
+ggplot(SpImeanDayType, aes(x=interval,y=MeanSteps,color=dayType)) + geom_line() +
+        xlab("5-minute interval") + ylab("Average number of steps")  + theme_bw()
+```
